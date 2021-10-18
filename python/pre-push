@@ -1,0 +1,80 @@
+#!/bin/bash
+
+RED="\033[31m";
+RED_UNDER="\033[4;31m"
+RED_BOLD_UNDER="\033[1;4;31m";
+MAGENTA_BOLD="\e[1;95m"
+YELLOW='\033[33m';
+GREEN_UNDER='\033[4;32m';
+CLEAR="\033[0m";
+
+all_success=0
+
+passed_output() {
+    if [ $1 == 0 ]; then
+        printf "\n\n${GREEN_UNDER}Passed${CLEAR}\n"
+    else
+        printf "\n\n${RED_UNDER}Failed${CLEAR}\n"
+        all_success=1
+    fi
+}
+
+check_command_exit_codes () {
+    if [ $all_success == 0 ]; then
+        printf "${GREEN_UNDER}All passed${CLEAR}\n"
+        exit 0
+    else
+        printf "${RED_BOLD_UNDER}One or more failures${CLEAR}\n"
+        exit 1
+    fi
+}
+
+run_tests () {
+    printf "${MAGENTA_BOLD}pytest:${CLEAR}\n";
+    pytest;
+
+    passed_output $?
+
+    printf "\n${MAGENTA_BOLD}mypy:${CLEAR}\n";
+    mypy app;
+
+    passed_output $?
+
+    printf "\n${MAGENTA_BOLD}pylint:${CLEAR}\n";
+    pylint app;
+
+    passed_output $?
+
+    printf "\n${MAGENTA_BOLD}flake8:${CLEAR}\n";
+    flake8 app;
+
+    passed_output $?
+    
+    printf "\n${MAGENTA_BOLD}bandit:${CLEAR}\n";
+    bandit -r ./app -x "*_test.py";
+
+    passed_output $?
+}
+
+CURRENT_BRANCH=$(git branch --show-current)
+if [ $CURRENT_BRANCH == "master" ]; then
+    exec < /dev/tty
+    read -p "$(printf "${YELLOW}You are about to push to the ${CLEAR}${RED_BOLD_UNDER}MASTER${CLEAR}${YELLOW} branch. Are you sure you want to do that?${CLEAR} [y|Y, n|N]   ")" INPUT
+    exec <&-
+
+    if [ "$INPUT" == "y" ] || [ "$INPUT" == "Y" ]; then
+        run_tests
+
+        check_command_exit_codes
+
+    else
+        exit 1
+
+    fi
+    
+else
+    run_tests
+
+    check_command_exit_codes
+
+fi
